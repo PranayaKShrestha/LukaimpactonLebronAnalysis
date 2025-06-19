@@ -1,0 +1,410 @@
+---
+title: Performance Analysis, Luka Dončić’s Impact On LeBron James
+author:
+  - name: Pranaya  
+    affil: 1
+    email: p6shrest@uwaterloo.ca
+    main: true
+affiliation:
+  - num: 1
+    address: Department of Statistic, University of Waterloo
+    
+#----Colours----#
+primary_colour: "#2D006F"
+
+main_findings:
+  - "**Performance Analysis**: Luka Dončić’s Impact On **LeBron James**"
+  - '![](lebron_transparent.png){.main_pic}'
+logoleft_name: '![](lakers_logo_3.png){.main-img-left}'
+logoright_name: '![](lakers_logo_3.png){.main-img-right}'
+output: 
+  posterdown::posterdown_betterland:
+    self_contained: false
+    pandoc_args: --mathjax
+    highlight: haddock
+    number_sections: false
+link-citations: true
+bibliography: packages.bib
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(results = 'asis',
+                      echo = FALSE,
+                      warning = FALSE,
+                      tidy = FALSE,
+                      message = FALSE,
+                      fig.align = 'center',
+                      out.width = "100%")
+options(knitr.table.format = "html") 
+```
+
+```{r}
+library(hoopR)
+library(ggradar)
+library(dplyr)
+library(scales)
+library(fmsb)
+library(ggplot2)
+library(gt)
+library(tidyverse)
+library(showtext)
+```
+# Introduction
+LeBron James has been one of the premier players in the NBA for over two decades, 
+consistently producing elite numbers. Throughout his career, he has played 
+alongside a number of talented teammates. However, the recent addition of 
+Luka Dončić to the Los Angeles Lakers arguably marks the arrival of the most 
+skilled teammate LeBron has ever played with. This project aims to analyze the 
+statistical impact of Luka on LeBron's performance. 
+```{r, include=FALSE}
+knitr::write_bib(c('posterdown', 'rmarkdown','pagedown'), 'packages.bib')
+```
+
+# Analysis
+```{r}
+plr = load_nba_player_box()
+team_box <- load_nba_team_box()
+
+#Games LeBron Played
+lebron_games = unique(plr$game_id[plr$athlete_display_name == "LeBron James"])
+lebron_2025 = subset(plr, plr$athlete_display_name == "LeBron James") 
+
+#removing the allstar game stats
+all_star_game = c(401752957, 401752956) 
+lebron_2025_main = subset(lebron_2025, lebron_2025$game_id != all_star_game)
+
+#Merging team boxscore for LeBron Played in 
+lebron_2025_main = merge(x = as.data.frame(lebron_2025_main), 
+                         y = as.data.frame(team_box), by.x = "game_id",
+                         by.y = "game_id")
+lebron_2025_main = subset(lebron_2025_main, team_name.y == "Lakers")
+
+#Adding Usage Rate column
+lebron_2025_main$Usage_Rate <- 100 * ((lebron_2025_main$field_goals_attempted.x 
+                                       + 0.44 * 
+                                         lebron_2025_main$free_throws_attempted.x
+                                       + lebron_2025_main$turnovers.x) * (240/5))/ 
+  (lebron_2025_main$minutes * (lebron_2025_main$field_goals_attempted.y + 0.44
+                               * lebron_2025_main$free_throws_attempted.y + 
+                                 lebron_2025_main$turnovers.y)) 
+
+#Luka Doncic Games
+luka_games = unique(plr$game_id[plr$athlete_display_name == "Luka Doncic"])
+
+
+#Lebron without Luka games and Lebron with Luka Games
+pre_luka = subset(lebron_2025_main, game_id %in% setdiff(lebron_games, 
+                                                         luka_games))
+post_luka = subset(lebron_2025_main, game_id %in% intersect(lebron_games, 
+                                                            luka_games))
+
+
+#Avgs of ket stats for LeBron pre-Luka
+Lebron_pre_luka_avgs = data.frame(minutes = mean(pre_luka$minutes), 
+                                  Field_goals_made =mean(pre_luka$field_goals_made.x),
+                                  
+              Three_pointers_made = mean(pre_luka$three_point_field_goals_made.x),
+                                                                                                                                                free_throws_made = mean(pre_luka$free_throws_made.x),
+                                                                                                                                                Rebounds = mean(pre_luka$rebounds), 
+                                                                                                                                                Assists = mean(pre_luka$assists.x),
+                                                                                                                                                Steals = mean(pre_luka$steals.x),
+                                                                                                                                                Blocks = mean(pre_luka$blocks.x), 
+                                                                                                                                                Turnovers = mean(pre_luka$turnovers.x), 
+                                                                                                                                                Fouls = mean(pre_luka$fouls.x), 
+                                                                                                                                                Points = mean(pre_luka$points),
+                                  
+              Usage_Rate = mean(pre_luka$Usage_Rate))
+
+#Avgs of ket stats for LeBron post-Luka
+Lebron_post_luka_avgs = data.frame(minutes = mean(post_luka$minutes), 
+                                  Field_goals_made =
+                                    mean(post_luka$field_goals_made.x),
+                                  
+                       Three_pointers_made = 
+                         mean(post_luka$three_point_field_goals_made.x), 
+                                                                                                                                                free_throws_made = mean(post_luka$free_throws_made.x),
+                                                                                                                                               Rebounds = mean(post_luka$rebounds), 
+                                                                                                                                                Assists = mean(post_luka$assists.x),
+                                                                                                                                                Steals = mean(post_luka$steals.x),
+                                                                                                                                                Blocks = mean(post_luka$blocks.x), 
+                                                                                                                                                Turnovers = mean(post_luka$turnovers.x), 
+                                                                                                                                                Fouls = mean(post_luka$fouls.x), 
+                                                                                                                                                Points = mean(post_luka$points),
+                                  Usage_Rate = mean(post_luka$Usage_Rate))
+
+
+stat_max <- c(38, 11.8, 4.4, 7.9, 14, 12, 3, 4, 5, 3.5, 33, 35)
+stat_min <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0)
+
+radar_data <- rbind(stat_min, stat_max, Lebron_post_luka_avgs, 
+                    Lebron_pre_luka_avgs)
+
+#Scaling each stat to the stat leader from the 2025 nba season
+normalize <- function(x, max_val) {
+  x / max_val
+}
+
+post_luka_row <- radar_data[3, ]  # 3rd row = Lebron_post_luka_avgs
+pre_luka_row <- radar_data[4, ] # 4rd row = Lebron_pre_luka_avgs
+
+
+# row 2 = stat_max
+post_luka_normalized <- mapply(normalize, post_luka_row, radar_data[2, ]) 
+pre_luka_normalized <- mapply(normalize, pre_luka_row, radar_data[2, ])  
+
+# Update radar_data
+radar_data[3, ] <- post_luka_normalized
+radar_data[4, ] <- pre_luka_normalized
+radar_data <- radar_data[-(1:2), ]
+rownames(radar_data) <- c("Post-Luka", "Pre-Luka")
+colnames(radar_data) <- c(
+  "Minutes", "FG Made", "3PT Made", "FT Made",
+  "Rebounds", "Assists", "Steals", "Blocks",
+  "Turnovers", "Fouls", "Points", "Usage Rate"
+)
+```
+
+```{r}
+ggradar(radar_data,
+        grid.line.width = 0.75,
+        grid.min = 0,
+        grid.mid = 0.5,
+        grid.max = 1,
+        values.radar = c('0','0.5', '1'),
+        axis.label.size = 4,
+        grid.label.size = 7,
+        group.point.size = 3,
+        group.line.width = 1.5,
+        background.circle.colour = 'white',
+        plot.title = 'LeBron James Averages') +
+  labs(subtitle = "Scaled relative to 2025 NBA leaders in each category") +
+  # Customize legend and title
+  scale_color_manual(name = "Period",
+                     values = c("#6A3FA1FF","#FDB927"),
+                     labels = c("Pre-Luka", "Post-Luka")) +
+  theme(plot.title = element_text(size = 25, hjust = 0.55),
+        plot.subtitle = element_text(size = 15, hjust = 0.55),
+        legend.position = 'right',
+        legend.title = element_text(size = 20),
+        legend.text = element_text(size = 15))
+```
+This radar plot compares LeBron James' key statistical categories before and 
+after Luka's arrival (Scaled relative to 2025 NBA Leaders). Overall, Most 
+categories remain consistent, though a decline in usage rate—expected given 
+Luka’s high usage—may correspond with a slight drops in assists and turnovers.
+In addition, increases in blocks and steals suggest an uptick in LeBron’s
+defensive impact post-Luka.
+```{r}
+dat_pbp = load_nba_pbp(seasons=2025) #play by play data
+df_pbp = data.frame(dat_pbp)
+
+#Pre-Luka LeBron Shooting plays
+lebron_played_games_pre = subset(df_pbp,game_id %in% setdiff(lebron_games, 
+                                                             luka_games))
+Lakers_shooting_plays_pre = subset(lebron_played_games_pre, 
+                                   shooting_play == TRUE & 
+                                     !grepl("Free Throw", type_text))
+lebron_shooting_plays_pre = subset(Lakers_shooting_plays_pre,
+                                   athlete_id_1 == 1966)
+
+#Pre-Luka LeBron shot type categorized
+lebron_shooting_plays_pre = lebron_shooting_plays_pre %>% 
+  mutate(Shot_type = case_when(grepl("Cutting", type_text) ~ "Cutting", 
+                               (grepl("Fade Away", type_text) | 
+                                  grepl("Turnaround", type_text)) ~ "Fade", 
+                               (grepl("Pullup", type_text) | 
+                                  grepl("Stepback", type_text)) ~ 
+                                 "Off Dribble", grepl("Jump Shot", type_text) ~ 
+                                 "Catch Shoot", (grepl("Layup", type_text) | 
+                                                   grepl("Dunk", type_text)) ~ 
+                                 "Layup", TRUE ~ "Other"))
+
+#Pre-Luka LeBron shot type total per game
+shot_type_summary_pre <- lebron_shooting_plays_pre %>%
+  group_by(game_id, Shot_type) %>%
+  summarise(shot_count = n()) %>%
+  ungroup() %>% mutate(Period = "Pre-Luka")
+
+#Post-luka LeBron Shooting plays
+lebron_played_games_post = subset(df_pbp,game_id %in% intersect(lebron_games, 
+                                                                luka_games))
+Lakers_shooting_plays_post = subset(lebron_played_games_post, shooting_play == 
+                                      TRUE & !grepl("Free Throw", type_text))
+lebron_shooting_plays_post = subset(Lakers_shooting_plays_post, athlete_id_1 ==
+                                      1966)
+
+#Post-Luka LeBron shot type categorized
+lebron_shooting_plays_post = lebron_shooting_plays_post %>% 
+  mutate(Shot_type = case_when(grepl("Cutting", type_text) ~ "Cutting", 
+                               (grepl("Fade Away", type_text) |
+                                  grepl("Turnaround", type_text)) ~ "Fade", 
+                               (grepl("Pullup", type_text) | 
+                                  grepl("Stepback", type_text)) ~
+                                 "Off Dribble", grepl("Jump Shot", type_text) ~ 
+                                 "Catch Shoot", (grepl("Layup", type_text) | 
+                                                   grepl("Dunk", type_text)) ~ 
+                                 "Layup", TRUE ~ "Other"))
+
+#Post-Luka LeBron shot type total per game
+shot_type_summary_post <- lebron_shooting_plays_post %>%
+  group_by(game_id, Shot_type) %>%
+  summarise(shot_count = n()) %>%
+  ungroup() %>% mutate(Period = "Post-Luka")
+
+#Union both pre and post Luka to display in a boxplot
+union_shot_type <- union(shot_type_summary_pre, shot_type_summary_post)
+```
+```{r, fig.width=7, fig.height=4}
+ggplot(union_shot_type, aes(x=Shot_type, y = shot_count, fill = Period)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("Post-Luka" = "#FDB927",
+                               "Pre-Luka" = "#6A3FA1" 
+                              ),
+                    name = "Period") +
+  labs(title = "Lebron James Shot Distribution Per Game",
+       subtitle = "LeBron James Before vs After Luka's Arrival",
+       x = "Shot Type",
+       y = "Number of Shots Attempted") +
+   scale_y_continuous(limits = c(0, 12), 
+                     breaks = seq(0, 12, by = 2)) +
+  theme_minimal()  +
+  theme(plot.title = element_text(size = 20, hjust = 0.5), 
+        plot.subtitle = element_text(size = 15, hjust = 0.5), 
+        axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = "right",
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 12))
+```
+While LeBron’s scoring remains consistent pre/post-Luka, the manner in which
+he generates those points may have shifted with the addition of Luka. 
+The figure above displays LeBron's shot distribution per game. 
+The most notable shifts occur in "Off Dribble" and "Catch and Shoot" attempts.
+Lebron appears to take fewer "Off-Dribble" shots post-Luka while increasing his 
+"Catch and Shoot" shots reflecting Luka's playmaking ability. Other shot types 
+remain relatively stable.
+```{r}
+
+#Adding Distance of shot Pre-Luka
+table_lebron_pre <- lebron_shooting_plays_pre
+table_lebron_pre$coordinate_x <- abs(table_lebron_pre$coordinate_x)
+table_lebron_pre$coordinate_y <- abs(table_lebron_pre$coordinate_y)
+table_lebron_pre$Distance <- sqrt((41.75 -table_lebron_pre$coordinate_x)^2 + 
+                                    (0-table_lebron_pre$coordinate_y)^2)
+
+#Summarizing each shot per game by FG%, Avg Distance, Frequency Pre-Luka
+table_lebron_pre <- table_lebron_pre %>% group_by(Shot_type) %>% 
+  summarise(Fg_percent = round(100 * mean(scoring_play == TRUE), digit = 2),
+            Avg.Distance = round(mean(Distance), digit = 2), Freq = n()) %>% 
+  mutate(Freq = round(100 * (Freq/sum(Freq)), digit = 2))
+table_lebron_pre$Luka = 'Pre_Luka'
+
+
+#Adding Distance of shot Post-Luka
+table_lebron_post <- lebron_shooting_plays_post
+table_lebron_post$coordinate_x <- abs(table_lebron_post$coordinate_x)
+table_lebron_post$coordinate_y <- abs(table_lebron_post$coordinate_y)
+table_lebron_post$Distance <- sqrt((41.75 -table_lebron_post$coordinate_x)^2 +
+                                     (0-table_lebron_post$coordinate_y)^2)
+
+
+#Summarizing each shot per game by FG%, Avg Distance, Frequency Post-Luka
+table_lebron_post <- table_lebron_post %>% group_by(Shot_type) %>% 
+  summarise(Fg_percent = round(100 * mean(scoring_play == TRUE), digit = 2),
+            Avg.Distance = round(mean(Distance), digit = 2), Freq = n()) %>% 
+  mutate(Freq = round(100 * (Freq/sum(Freq)), digit = 2))
+table_lebron_post$Luka <- 'Post_Luka'
+
+
+
+post_pre_union <- union(table_lebron_pre, table_lebron_post)
+
+
+post_pre_union <- post_pre_union %>% group_by(Shot_type) %>%
+  summarize(Period = Luka, Fg_Percent = Fg_percent, 
+            Avg.Distance = Avg.Distance, Freq= Freq) %>% ungroup()
+
+#changing the format of the table so that I can compare pre-Luka post-Luka stats
+post_pre_wide <- post_pre_union %>%
+  pivot_wider(
+    names_from = Period,
+    values_from = c(Fg_Percent, Avg.Distance, Freq),
+    names_sep = "_"
+  )
+
+# Add arrows direction
+post_pre_wide <- post_pre_wide %>%
+  mutate(
+    FG_change = ifelse(Fg_Percent_Post_Luka > Fg_Percent_Pre_Luka,
+                       "arrow-up-long", "arrow-down-long"),
+    Dist_change = ifelse(Avg.Distance_Post_Luka > Avg.Distance_Pre_Luka,
+                         "arrow-up-long", "arrow-down-long"),
+    Freq_change = ifelse(Freq_Post_Luka > Freq_Pre_Luka,
+                         "arrow-up-long", "arrow-down-long")
+  )
+
+#Final Table
+final_table = post_pre_wide %>% select(Shot_type, Fg_Percent_Pre_Luka, 
+                                       Fg_Percent_Post_Luka, FG_change,
+                                       Avg.Distance_Pre_Luka,
+                                       Avg.Distance_Post_Luka, 
+                                       Dist_change, Freq_Pre_Luka, 
+                                       Freq_Post_Luka, Freq_change)
+```
+
+```{r,out.width='100%', fig.align='center'}
+final_table %>% gt() %>%
+  tab_header(title = md('Lebron James Statistics by Shot Type'), 
+             subtitle = md('Before and After Luka Doncic')) %>%
+  tab_style(style = cell_fill(color = "#FFE6CC"), 
+            locations = cells_body(columns = Shot_type,
+                                   rows = Shot_type == "Cutting")) %>%
+  tab_style(style = cell_fill(color = "#FFD1DC"), 
+            locations = cells_body(columns = Shot_type, rows = 
+                                     Shot_type == "Layup"))  %>%
+  tab_style(style = cell_fill(color = "#FFF2CC"), locations = 
+              cells_body(columns = Shot_type, rows = Shot_type == "Fade")) %>%
+  tab_style(style = cell_fill(color = "#DDEBF7"), locations = 
+              cells_body(columns = Shot_type, rows = Shot_type == 
+                           "Off Dribble")) %>%
+  tab_style(style = cell_fill(color = "#E8E8E8"), locations = 
+              cells_body(columns = Shot_type, rows = Shot_type == "Other")) %>%
+  tab_style(style = cell_fill(color = "#C8E6C9"), 
+            locations = cells_body(columns = Shot_type,
+                                   rows = Shot_type == 
+                                     "Catch Shoot")) %>%
+  fmt_icon(columns = c(FG_change, Dist_change, Freq_change),
+           fill_color = c("arrow-up-long" = "green","arrow-down-long" = 
+                            "red" )) %>%
+  cols_label(Shot_type = 'Shot Type',
+             Fg_Percent_Pre_Luka = "FG% Pre-Luka",
+             Fg_Percent_Post_Luka ="FG% Post-Luka",
+             FG_change = '',
+             Avg.Distance_Pre_Luka = "Avg Distance Pre-Luka", 
+             Avg.Distance_Post_Luka = "Avg Distance Post-Luka", 
+             Dist_change = '', 
+             Freq_Pre_Luka = "Frequency Pre-Luka",
+             Freq_Post_Luka = "Frequency Post-Luka",
+             Freq_change = '') %>%
+   tab_options(
+    heading.title.font.size = 55,         
+    heading.subtitle.font.size = 45,      
+    column_labels.font.size = 35,         
+    table.font.size = 30                 
+  )
+```
+The table above displays LeBron's FG%, avg. distance, and frequency of each shot
+type. LeBron's FG% on cuts and fade-away shots increased notably corresponding 
+with decrease in distance of those shots. Conversely, catch and shoot, off-dribble
+and other shot types saw a decline in FG%, although catch-and-shoot frequency 
+increased, likely due to Luka’s playmaking. Most of the distance of each shot 
+remains stable while the frequency correlates with the box-plot figure.
+<br>
+
+# Conclusion
+Overall, Most of LeBron’s key stats remained stable after Luka’s
+arrival, but his shot selection shifted. Luka’s playmaking led to more 
+catch-and-shoot attempts and fewer off-dribble shots. A key limitation is 
+the small sample size of games played together, which may increase variance 
+in the post-Luka data. 
+
