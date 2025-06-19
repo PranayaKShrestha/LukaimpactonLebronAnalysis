@@ -1,0 +1,392 @@
+```{r}
+library(hoopR)
+library(ggradar)
+library(dplyr)
+library(scales)
+library(fmsb)
+library(ggplot2)
+library(gt)
+library(tidyverse)
+library(showtext)
+```
+Option 1:
+
+```{r}
+plr = load_nba_player_box()
+team_box <- load_nba_team_box()
+
+#Games LeBron Played
+lebron_games = unique(plr$game_id[plr$athlete_display_name == "LeBron James"])
+lebron_2025 = subset(plr, plr$athlete_display_name == "LeBron James") 
+
+#removing the allstar game stats
+all_star_game = c(401752957, 401752956) 
+lebron_2025_main = subset(lebron_2025, lebron_2025$game_id != all_star_game)
+
+#Merging team boxscore for LeBron Played in 
+lebron_2025_main = merge(x = as.data.frame(lebron_2025_main), 
+                         y = as.data.frame(team_box), by.x = "game_id",
+                         by.y = "game_id")
+lebron_2025_main = subset(lebron_2025_main, team_name.y == "Lakers")
+
+#Adding Usage Rate column
+lebron_2025_main$Usage_Rate <- 100 * ((lebron_2025_main$field_goals_attempted.x 
+                                       + 0.44 * 
+                                         lebron_2025_main$free_throws_attempted.x
+                                       + lebron_2025_main$turnovers.x) * (240/5))/ 
+  (lebron_2025_main$minutes * (lebron_2025_main$field_goals_attempted.y + 0.44
+                               * lebron_2025_main$free_throws_attempted.y + 
+                                 lebron_2025_main$turnovers.y)) 
+
+#Luka Doncic Games
+luka_games = unique(plr$game_id[plr$athlete_display_name == "Luka Doncic"])
+
+
+#Lebron without Luka games and Lebron with Luka Games
+pre_luka = subset(lebron_2025_main, game_id %in% setdiff(lebron_games, 
+                                                         luka_games))
+post_luka = subset(lebron_2025_main, game_id %in% intersect(lebron_games, 
+                                                            luka_games))
+
+
+#Avgs of ket stats for LeBron pre-Luka
+Lebron_pre_luka_avgs = data.frame(minutes = mean(pre_luka$minutes), 
+                                  Field_goals_made =mean(pre_luka$field_goals_made.x),
+                                  
+              Three_pointers_made = mean(pre_luka$three_point_field_goals_made.x),
+                                                                                                                                                free_throws_made = mean(pre_luka$free_throws_made.x),
+                                                                                                                                                Rebounds = mean(pre_luka$rebounds), 
+                                                                                                                                                Assists = mean(pre_luka$assists.x),
+                                                                                                                                                Steals = mean(pre_luka$steals.x),
+                                                                                                                                                Blocks = mean(pre_luka$blocks.x), 
+                                                                                                                                                Turnovers = mean(pre_luka$turnovers.x), 
+                                                                                                                                                Fouls = mean(pre_luka$fouls.x), 
+                                                                                                                                                Points = mean(pre_luka$points),
+                                  
+              Usage_Rate = mean(pre_luka$Usage_Rate))
+
+#Avgs of ket stats for LeBron post-Luka
+Lebron_post_luka_avgs = data.frame(minutes = mean(post_luka$minutes), 
+                                  Field_goals_made =
+                                    mean(post_luka$field_goals_made.x),
+                                  
+                       Three_pointers_made = 
+                         mean(post_luka$three_point_field_goals_made.x), 
+                                                                                                                                                free_throws_made = mean(post_luka$free_throws_made.x),
+                                                                                                                                               Rebounds = mean(post_luka$rebounds), 
+                                                                                                                                                Assists = mean(post_luka$assists.x),
+                                                                                                                                                Steals = mean(post_luka$steals.x),
+                                                                                                                                                Blocks = mean(post_luka$blocks.x), 
+                                                                                                                                                Turnovers = mean(post_luka$turnovers.x), 
+                                                                                                                                                Fouls = mean(post_luka$fouls.x), 
+                                                                                                                                                Points = mean(post_luka$points),
+                                  Usage_Rate = mean(post_luka$Usage_Rate))
+
+
+stat_max <- c(38, 11.8, 4.4, 7.9, 14, 12, 3, 4, 5, 3.5, 33, 35)
+stat_min <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0)
+
+radar_data <- rbind(stat_min, stat_max, Lebron_post_luka_avgs, 
+                    Lebron_pre_luka_avgs)
+
+#Scaling each stat to the stat leader from the 2025 nba season
+normalize <- function(x, max_val) {
+  x / max_val
+}
+
+post_luka_row <- radar_data[3, ]  # 3rd row = Lebron_post_luka_avgs
+pre_luka_row <- radar_data[4, ] # 4rd row = Lebron_pre_luka_avgs
+
+
+# row 2 = stat_max
+post_luka_normalized <- mapply(normalize, post_luka_row, radar_data[2, ]) 
+pre_luka_normalized <- mapply(normalize, pre_luka_row, radar_data[2, ])  
+
+# Update radar_data
+radar_data[3, ] <- post_luka_normalized
+radar_data[4, ] <- pre_luka_normalized
+radar_data <- radar_data[-(1:2), ]
+rownames(radar_data) <- c("Post-Luka", "Pre-Luka")
+colnames(radar_data) <- c(
+  "Minutes", "FG Made", "3PT Made", "FT Made",
+  "Rebounds", "Assists", "Steals", "Blocks",
+  "Turnovers", "Fouls", "Points", "Usage Rate"
+)
+```
+
+```{r}
+ggradar(radar_data,
+        grid.line.width = 0.75,
+        grid.min = 0,
+        grid.mid = 0.5,
+        grid.max = 1,
+        values.radar = c('0','0.5', '1'),
+        axis.label.size = 4,
+        grid.label.size = 7,
+        group.point.size = 3,
+        group.line.width = 1.5,
+        background.circle.colour = 'white',
+        plot.title = 'LeBron James Averages') +
+  labs(subtitle = "Scaled relative to 2025 NBA leaders in each category") +
+  # Customize legend and title
+  scale_color_manual(name = "Period",
+                     values = c("#6A3FA1FF","#FDB927"),
+                     labels = c("Pre-Luka", "Post-Luka")) +
+  theme(plot.title = element_text(size = 25, hjust = 0.55),
+        plot.subtitle = element_text(size = 15, hjust = 0.55),
+        legend.position = 'right',
+        legend.title = element_text(size = 20),
+        legend.text = element_text(size = 15))
+```
+Option 3:
+
+```{r}
+dat_pbp = load_nba_pbp(seasons=2025) #play by play data
+df_pbp = data.frame(dat_pbp)
+
+#Pre-Luka LeBron Shooting plays
+lebron_played_games_pre = subset(df_pbp,game_id %in% setdiff(lebron_games, 
+                                                             luka_games))
+Lakers_shooting_plays_pre = subset(lebron_played_games_pre, 
+                                   shooting_play == TRUE & 
+                                     !grepl("Free Throw", type_text))
+lebron_shooting_plays_pre = subset(Lakers_shooting_plays_pre,
+                                   athlete_id_1 == 1966)
+
+#Pre-Luka LeBron shot type categorized
+lebron_shooting_plays_pre = lebron_shooting_plays_pre %>% 
+  mutate(Shot_type = case_when(grepl("Cutting", type_text) ~ "Cutting", 
+                               (grepl("Fade Away", type_text) | 
+                                  grepl("Turnaround", type_text)) ~ "Fade", 
+                               (grepl("Pullup", type_text) | 
+                                  grepl("Stepback", type_text)) ~ 
+                                 "Off Dribble", grepl("Jump Shot", type_text) ~ 
+                                 "Catch Shoot", (grepl("Layup", type_text) | 
+                                                   grepl("Dunk", type_text)) ~ 
+                                 "Layup", TRUE ~ "Other"))
+
+#Pre-Luka LeBron shot type total per game
+shot_type_summary_pre <- lebron_shooting_plays_pre %>%
+  group_by(game_id, Shot_type) %>%
+  summarise(shot_count = n()) %>%
+  ungroup() %>% mutate(Period = "Pre-Luka")
+
+#Post-luka LeBron Shooting plays
+lebron_played_games_post = subset(df_pbp,game_id %in% intersect(lebron_games, 
+                                                                luka_games))
+Lakers_shooting_plays_post = subset(lebron_played_games_post, shooting_play == 
+                                      TRUE & !grepl("Free Throw", type_text))
+lebron_shooting_plays_post = subset(Lakers_shooting_plays_post, athlete_id_1 ==
+                                      1966)
+
+#Post-Luka LeBron shot type categorized
+lebron_shooting_plays_post = lebron_shooting_plays_post %>% 
+  mutate(Shot_type = case_when(grepl("Cutting", type_text) ~ "Cutting", 
+                               (grepl("Fade Away", type_text) |
+                                  grepl("Turnaround", type_text)) ~ "Fade", 
+                               (grepl("Pullup", type_text) | 
+                                  grepl("Stepback", type_text)) ~
+                                 "Off Dribble", grepl("Jump Shot", type_text) ~ 
+                                 "Catch Shoot", (grepl("Layup", type_text) | 
+                                                   grepl("Dunk", type_text)) ~ 
+                                 "Layup", TRUE ~ "Other"))
+
+#Post-Luka LeBron shot type total per game
+shot_type_summary_post <- lebron_shooting_plays_post %>%
+  group_by(game_id, Shot_type) %>%
+  summarise(shot_count = n()) %>%
+  ungroup() %>% mutate(Period = "Post-Luka")
+
+#Union both pre and post Luka to display in a boxplot
+union_shot_type <- union(shot_type_summary_pre, shot_type_summary_post)
+```
+
+```{r}
+ggplot(union_shot_type, aes(x=Shot_type, y = shot_count, fill = Period)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("Post-Luka" = "#FDB927",
+                               "Pre-Luka" = "#6A3FA1" 
+                              ),
+                    name = "Period") +
+  labs(title = "Lebron James Shot Distribution Per Game",
+       subtitle = "LeBron James Before vs After Luka's Arrival",
+       x = "Shot Type",
+       y = "Number of Shots Attempted") +
+   scale_y_continuous(limits = c(0, 12), 
+                     breaks = seq(0, 12, by = 2)) +
+  theme_minimal()  +
+  theme(plot.title = element_text(size = 20, hjust = 0.5), 
+        plot.subtitle = element_text(size = 15, hjust = 0.5), 
+        axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    legend.position = "right",
+    legend.title = element_text(size = 15),
+    legend.text = element_text(size = 12))
+```
+
+Option 5:
+
+```{r}
+
+#Adding Distance of shot Pre-Luka
+table_lebron_pre <- lebron_shooting_plays_pre
+table_lebron_pre$coordinate_x <- abs(table_lebron_pre$coordinate_x)
+table_lebron_pre$coordinate_y <- abs(table_lebron_pre$coordinate_y)
+table_lebron_pre$Distance <- sqrt((41.75 -table_lebron_pre$coordinate_x)^2 + 
+                                    (0-table_lebron_pre$coordinate_y)^2)
+
+#Summarizing each shot per game by FG%, Avg Distance, Frequency Pre-Luka
+table_lebron_pre <- table_lebron_pre %>% group_by(Shot_type) %>% 
+  summarise(Fg_percent = round(100 * mean(scoring_play == TRUE), digit = 2),
+            Avg.Distance = round(mean(Distance), digit = 2), Freq = n()) %>% 
+  mutate(Freq = round(100 * (Freq/sum(Freq)), digit = 2))
+table_lebron_pre$Luka = 'Pre_Luka'
+
+
+#Adding Distance of shot Post-Luka
+table_lebron_post <- lebron_shooting_plays_post
+table_lebron_post$coordinate_x <- abs(table_lebron_post$coordinate_x)
+table_lebron_post$coordinate_y <- abs(table_lebron_post$coordinate_y)
+table_lebron_post$Distance <- sqrt((41.75 -table_lebron_post$coordinate_x)^2 +
+                                     (0-table_lebron_post$coordinate_y)^2)
+
+
+#Summarizing each shot per game by FG%, Avg Distance, Frequency Post-Luka
+table_lebron_post <- table_lebron_post %>% group_by(Shot_type) %>% 
+  summarise(Fg_percent = round(100 * mean(scoring_play == TRUE), digit = 2),
+            Avg.Distance = round(mean(Distance), digit = 2), Freq = n()) %>% 
+  mutate(Freq = round(100 * (Freq/sum(Freq)), digit = 2))
+table_lebron_post$Luka <- 'Post_Luka'
+
+
+
+post_pre_union <- union(table_lebron_pre, table_lebron_post)
+
+
+post_pre_union <- post_pre_union %>% group_by(Shot_type) %>%
+  summarize(Period = Luka, Fg_Percent = Fg_percent, 
+            Avg.Distance = Avg.Distance, Freq= Freq) %>% ungroup()
+
+#changing the format of the table so that I can compare pre-Luka post-Luka stats
+post_pre_wide <- post_pre_union %>%
+  pivot_wider(
+    names_from = Period,
+    values_from = c(Fg_Percent, Avg.Distance, Freq),
+    names_sep = "_"
+  )
+
+# Add arrows direction
+post_pre_wide <- post_pre_wide %>%
+  mutate(
+    FG_change = ifelse(Fg_Percent_Post_Luka > Fg_Percent_Pre_Luka,
+                       "arrow-up-long", "arrow-down-long"),
+    Dist_change = ifelse(Avg.Distance_Post_Luka > Avg.Distance_Pre_Luka,
+                         "arrow-up-long", "arrow-down-long"),
+    Freq_change = ifelse(Freq_Post_Luka > Freq_Pre_Luka,
+                         "arrow-up-long", "arrow-down-long")
+  )
+
+#Final Table
+final_table = post_pre_wide %>% select(Shot_type, Fg_Percent_Pre_Luka, 
+                                       Fg_Percent_Post_Luka, FG_change,
+                                       Avg.Distance_Pre_Luka,
+                                       Avg.Distance_Post_Luka, 
+                                       Dist_change, Freq_Pre_Luka, 
+                                       Freq_Post_Luka, Freq_change)
+```
+
+```{r}
+final_table %>% gt() %>%
+  tab_header(title = md('Lebron James Statistics by Shot Type'), 
+             subtitle = md('Before and After Luka Doncic')) %>%
+  tab_style(style = cell_fill(color = "#FFE6CC"), 
+            locations = cells_body(columns = Shot_type,
+                                   rows = Shot_type == "Cutting")) %>%
+  tab_style(style = cell_fill(color = "#FFD1DC"), 
+            locations = cells_body(columns = Shot_type, rows = 
+                                     Shot_type == "Layup"))  %>%
+  tab_style(style = cell_fill(color = "#FFF2CC"), locations = 
+              cells_body(columns = Shot_type, rows = Shot_type == "Fade")) %>%
+  tab_style(style = cell_fill(color = "#DDEBF7"), locations = 
+              cells_body(columns = Shot_type, rows = Shot_type == 
+                           "Off Dribble")) %>%
+  tab_style(style = cell_fill(color = "#E8E8E8"), locations = 
+              cells_body(columns = Shot_type, rows = Shot_type == "Other")) %>%
+  tab_style(style = cell_fill(color = "#C8E6C9"), 
+            locations = cells_body(columns = Shot_type,
+                                   rows = Shot_type == 
+                                     "Catch Shoot")) %>%
+  fmt_icon(columns = c(FG_change, Dist_change, Freq_change),
+           fill_color = c("arrow-up-long" = "green","arrow-down-long" = 
+                            "red" )) %>%
+  cols_label(Shot_type = 'Shot Type',
+             Fg_Percent_Pre_Luka = "FG% Pre-Luka",
+             Fg_Percent_Post_Luka ="FG% Post-Luka",
+             FG_change = '',
+             Avg.Distance_Pre_Luka = "Avg Distance Pre-Luka", 
+             Avg.Distance_Post_Luka = "Avg Distance Post-Luka", 
+             Dist_change = '', 
+             Freq_Pre_Luka = "Frequency Pre-Luka",
+             Freq_Post_Luka = "Frequency Post-Luka",
+             Freq_change = '')
+```
+
+Option 4:
+
+```{r}
+# Adding the "lakers" font
+font_add(family = "LakersAlt", 
+         regular = "C:/Users/prana/Documents/STAT 442/Project/Luka Doncic Impact on Lebron James Analysis/Lakers Alt.ttf")
+showtext_auto()
+
+plot.new()
+plot.window(xlim =c(0,2.5), ylim=c(0,2), asp =1)
+
+# Define circle parameters
+radius <- 0.8
+center_x <- 1
+center_y <- 1
+n_points <- 100  # More points = smoother circle
+
+# Calculate circle coordinates
+theta <- seq(0, 2*pi, length.out = n_points)
+x <- center_x + radius * cos(theta)
+y <- center_y + radius * sin(theta)
+
+# Draw the circle
+polygon(x, y, col = "#FDB927", lwd = 2, border ="white")
+segments(0.9, 1.5, 0.80, 1.77, lwd = 2, col = "black")
+segments(1.33, 0.285, 1.17, 0.771, lwd = 2, col = "black")
+curve(-0.6 * (x - 1)^2 + 1.65, from = 0.4, to = 1.65, add = TRUE, n = 100, lwd = 2, col = "black")
+curve(-0.82*(x-1)^2 +1.8, from = 0.32, to = 1.70, add = TRUE, n = 100, lwd = 2, col = "black")
+curve(0.82*(x-1)^2 +0.2, from = 0.32, to = 1.69, add = TRUE, n = 100, lwd = 2, col = "black")
+
+y_vals <- seq(1.5, 1.66, length.out = 100)
+x_vals1 <- -4 * (y_vals - 1.5)^2 + 0.7
+lines(x_vals1, y_vals, col = "black", lwd = 2)
+
+
+y_vals_2 <- seq(1.45, 1.78, length.out = 100)
+x_vals2 <- 20 * (y_vals - 1.6)^2 + 1
+lines(x_vals2, y_vals_2, col = "black", lwd = 2)
+
+y_vals_3 <- seq(0.23, 0.75, length.out = 100)
+x_vals3 <- -0.6 * (y_vals - 0.9)^2 + 1.1
+lines(x_vals3, y_vals_3, col = "black", lwd = 2)
+
+text(1, 1, "Lakers", family = "LakersAlt", cex = 9.4, col = "#6A3FA1FF")
+text(1.25, 1.30, "Los Angeles", family = "LakersAlt", cex = 4, col = "#6A3FA1FF")
+
+```
+
+```{r}
+library(png)
+library(magick)
+img <- image_read("lebron_2.png")  # or any image you upload
+img_transparent <- image_transparent(img, color = "white", fuzz = 20)
+img_resized <- image_resize(img_transparent, "100x")
+image_write(img_resized, "lebron_transparent.png", format = "png")
+
+
+```
+
